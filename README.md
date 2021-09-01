@@ -1,2 +1,2 @@
 # Machine-Learning
-A repository containing my personal projects in the world of ML
+A repository containing my personal exploration of the world of ML
