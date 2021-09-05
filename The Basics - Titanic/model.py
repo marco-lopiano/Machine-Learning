@@ -3,12 +3,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 import json
+import random
 
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler
 
 import tensorflow as tf
-from tensorflow.keras.models import Sequential
+from tensorflow.keras.models import Sequential, load_model
 from tensorflow.keras.layers import Dense, Dropout
 from tensorflow.keras.optimizers import Adam
 
@@ -39,7 +40,8 @@ def model_create(number_features,
 
     for i in range(hidden_layer):
         model.add(Dense(neurons, input_dim=number_features, activation=activation_func))
-        model.add(Dropout(dropout))
+        if dropout > 0.0:
+            model.add(Dropout(dropout))
 
     model.add(Dense(1, activation='sigmoid'))
 
@@ -109,21 +111,7 @@ def plot_performance(model, history_dict, save=False, my_dpi=126):
 
     plt.show()
 
-
-# Loading data and converting it to nupy array
-data = pd.read_csv('clean.csv')
-data = data.astype(float)
-X = data.drop('Survived',axis=1)
-y = data['Survived']
-X_np = X.values
-y_np = y.values
-
-X_train, X_test, y_train, y_test = train_test_split(X_np, y_np, test_size = 0.25)
-X_train_sc, X_test_sc = scale_data(X_train, X_test)
-
-number_features = X_train_sc.shape[1]
-
-def train_and_fit(X_train_sc, y_train, y_test, number_features, EPOCHS=250, HIDDEN_LAYERS=3, NEURONS=128, DROPOUT=0.5, save=False):
+def train_and_fit(X_train_sc, y_train, X_test_sc, y_test, number_features, EPOCHS=250, HIDDEN_LAYERS=3, NEURONS=128, DROPOUT=0.5, save=False):
 
     model = model_create(number_features,
                     hidden_layer=HIDDEN_LAYERS,
@@ -132,14 +120,14 @@ def train_and_fit(X_train_sc, y_train, y_test, number_features, EPOCHS=250, HIDD
                     dropout=DROPOUT,
                     learning_rate=0.003)
 
-    early_stopping_cb = tf.keras.callbacks.EarlyStopping(patience=50, restore_best_weights=True)
+    early_stopping_cb = tf.keras.callbacks.EarlyStopping(patience=25, restore_best_weights=True)
+    #callbacks=[early_stopping_cb]
     history = model.fit(X_train_sc,
                         y_train,
                         epochs=EPOCHS,
                         batch_size=64,
                         validation_data=(X_test_sc, y_test),
-                        verbose=1,
-                        callbacks=[early_stopping_cb])
+                        verbose=1)
 
 
     if save:
@@ -153,5 +141,101 @@ def train_and_fit(X_train_sc, y_train, y_test, number_features, EPOCHS=250, HIDD
 
     return (model, history.history)
 
-hist = train_and_fit(X_train_sc, y_train, y_test, number_features, EPOCHS=125, HIDDEN_LAYERS=1, NEURONS=68, DROPOUT=0.0, save=False)
-plot_performance(hist[0], hist[1], save=True)
+
+if __name__ == '__main__':
+
+    STORED_MODEL = True
+
+    if not STORED_MODEL:
+        # Loading data and converting it to nupy array
+        data = pd.read_csv('clean.csv')
+        data = data.astype(float)
+        X = data.drop('Survived',axis=1)
+        X = X.drop('Fare',axis=1)
+        y = data['Survived']
+        X_np = X.values
+        y_np = y.values
+
+        X_train, X_test, y_train, y_test = train_test_split(X_np, y_np, test_size = 0.25)
+        X_train_sc, X_test_sc = scale_data(X_train, X_test)
+
+        number_features = X_train_sc.shape[1]
+
+        hist = train_and_fit(X_train_sc, y_train, X_test_sc, y_test, number_features, EPOCHS=250, HIDDEN_LAYERS=6, NEURONS=128, DROPOUT=0.0, save=True)
+        plot_performance(hist[0], hist[1], save=False)
+
+    else:
+        # CONTROLS
+        ITER = 300
+
+        # Loading data and converting it to nupy array
+        raw = pd.read_csv('full_data.csv')
+        data = pd.read_csv('clean.csv')
+        data = data.astype(float)
+        X = data.drop('Survived',axis=1)
+        X = X.drop('Fare',axis=1)
+        y = data['Survived']
+        X_np = X.values
+        y_np = y.values
+
+        # scaling inputs because the model has been trained on norm data
+        sc = MinMaxScaler()
+        sc.fit(X_np)
+        X_np = sc.transform(X_np)
+
+        models = os.listdir("models")
+        m = sorted(models)[-1]
+        path = os.path.join('models', m)
+
+        # the actual loaded model
+        testing_model = load_model(path)
+
+        RIGHTS = 0
+        WRONGS = 0
+        DIED_FOR_SURVIDED = 0
+        SURVIVED_FOR_DIED = 0
+
+        for i in range(ITER):
+
+            print('*'*50)
+            NUM = random.randint(0,len(X_np)-1)
+
+            predictions = testing_model.predict(X_np, verbose=3)
+
+            pass_name = raw.values[NUM][2]
+            correct_ = y_np[NUM]
+            out_ = predictions[NUM]
+
+            if out_ < 0.5:
+                out_ = 0
+            else:
+                out_ = 1
+
+            if out_ == 0:
+                res_ = 'died'
+            elif out_ == 1:
+                res_ = 'survived'
+
+            print(f"input array is: {X_np[NUM]}")
+            print(f"correct label is {correct_}")
+            print(f"model prediction is: {out_}")
+
+            if correct_ == out_:
+                RIGHTS+=1
+                print(f"Model prediction is correct: {pass_name} {res_} in the Titanic accident")
+            else:
+                WRONGS+=1
+                if res_ == 'died':
+                    DIED_FOR_SURVIDED+=1
+                    exp = 'survided'
+                else:
+                    SURVIVED_FOR_DIED+=1
+                    exp = 'died'
+                print(f"Model prediction is wrong: {pass_name} {exp} but the model predicted he/she {res_}")
+
+        print('\n')
+        print(f'Evaluating model {m}')
+        print(f'{"-"*3} Model has been {RIGHTS} times right - {(RIGHTS/ITER)*100}%')
+        print(f'{"-"*3} Model has been {WRONGS} times wrong - {(WRONGS/ITER)*100}%')
+        print(f'{"-"*6} {DIED_FOR_SURVIDED} times models said passenger DIED but instead SURVIVED')
+        print(f'{"-"*6} {SURVIVED_FOR_DIED} times models said passenger SURVIVED but instead DIED')
