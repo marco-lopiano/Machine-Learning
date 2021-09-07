@@ -11,7 +11,7 @@ from sklearn.preprocessing import MinMaxScaler
 import tensorflow as tf
 from tensorflow.keras.models import Sequential, load_model
 from tensorflow.keras.layers import Dense, Dropout
-from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.optimizers import Adam, SGD, RMSprop, Adagrad
 
 '''
 HUGE HELP FROM:
@@ -33,7 +33,7 @@ def model_create(number_features,
                 neurons=32,
                 activation_func='relu',
                 dropout=0.0,
-                learning_rate=0.003):
+                learning_rate=0.001):
 
     ''' Create a Tensorflow model '''
     model = Sequential()
@@ -45,7 +45,12 @@ def model_create(number_features,
 
     model.add(Dense(1, activation='sigmoid'))
 
-    opt = Adam(learning_rate=learning_rate)
+    adam = Adam(learning_rate=learning_rate)
+    rms_prop = RMSprop(learning_rate=learning_rate, momentum=0.5)
+    sgd = RMSprop(learning_rate=learning_rate, momentum=0.5)
+    adagrad = Adagrad(learning_rate=0.001)
+
+    opt = adam
 
     model.compile(loss='binary_crossentropy',
                 optimizer=opt,
@@ -111,7 +116,7 @@ def plot_performance(model, history_dict, save=False, my_dpi=126):
 
     plt.show()
 
-def train_and_fit(X_train_sc, y_train, X_test_sc, y_test, number_features, EPOCHS=250, HIDDEN_LAYERS=3, NEURONS=128, DROPOUT=0.5, save=False):
+def train_and_fit(X_train_sc, y_train, X_test_sc, y_test, number_features, EPOCHS=250, HIDDEN_LAYERS=2, NEURONS=128, DROPOUT=0.3, save=False):
 
     model = model_create(number_features,
                     hidden_layer=HIDDEN_LAYERS,
@@ -121,13 +126,13 @@ def train_and_fit(X_train_sc, y_train, X_test_sc, y_test, number_features, EPOCH
                     learning_rate=0.003)
 
     early_stopping_cb = tf.keras.callbacks.EarlyStopping(patience=25, restore_best_weights=True)
-    #callbacks=[early_stopping_cb]
     history = model.fit(X_train_sc,
                         y_train,
                         epochs=EPOCHS,
                         batch_size=64,
                         validation_data=(X_test_sc, y_test),
-                        verbose=1)
+                        verbose=1,
+                        callbacks=[early_stopping_cb])
 
 
     if save:
@@ -139,7 +144,7 @@ def train_and_fit(X_train_sc, y_train, X_test_sc, y_test, number_features, EPOCH
 
         model.save(f'models/titanic_model_{num}.model')
 
-    return (model, history.history)
+    return [model, history.history]
 
 
 if __name__ == '__main__':
@@ -151,7 +156,6 @@ if __name__ == '__main__':
         data = pd.read_csv('clean.csv')
         data = data.astype(float)
         X = data.drop('Survived',axis=1)
-        X = X.drop('Fare',axis=1)
         y = data['Survived']
         X_np = X.values
         y_np = y.values
@@ -161,8 +165,10 @@ if __name__ == '__main__':
 
         number_features = X_train_sc.shape[1]
 
-        hist = train_and_fit(X_train_sc, y_train, X_test_sc, y_test, number_features, EPOCHS=250, HIDDEN_LAYERS=6, NEURONS=128, DROPOUT=0.0, save=True)
-        plot_performance(hist[0], hist[1], save=False)
+        hist = train_and_fit(X_train_sc, y_train, X_test_sc, y_test, number_features, EPOCHS=250, HIDDEN_LAYERS=2, NEURONS=128, DROPOUT=0.5, save=True)
+        plot_performance(hist[0], hist[1], save=True)
+
+        del hist[0]
 
     else:
         # CONTROLS
@@ -173,7 +179,6 @@ if __name__ == '__main__':
         data = pd.read_csv('clean.csv')
         data = data.astype(float)
         X = data.drop('Survived',axis=1)
-        X = X.drop('Fare',axis=1)
         y = data['Survived']
         X_np = X.values
         y_np = y.values
@@ -197,7 +202,7 @@ if __name__ == '__main__':
 
         for i in range(ITER):
 
-            print('*'*50)
+            print('*'*75)
             NUM = random.randint(0,len(X_np)-1)
 
             predictions = testing_model.predict(X_np, verbose=3)
