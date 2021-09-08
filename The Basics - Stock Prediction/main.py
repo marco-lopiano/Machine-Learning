@@ -96,6 +96,8 @@ def preprocess_df(df, SEQ_LEN, balance=False):
 
     return np.array(X), y
 
+    test
+
 
 df = pd.read_csv("data/aapl_hist.csv")
 df.set_index('Date', inplace=True)
