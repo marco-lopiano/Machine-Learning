@@ -1,6 +1,7 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import os
+from datetime import datetime
 from collections import deque
 import numpy as np
 import random
@@ -8,16 +9,21 @@ import random
 import sklearn
 from sklearn.preprocessing import MinMaxScaler
 
+import tensorflow as tf
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense, Dropout, LSTM, BatchNormalization
+from tensorflow.keras.callbacks import TensorBoard
+from tensorflow.keras.callbacks import ModelCheckpoint
+
+import model as md
+
 '''
 VERY HELPFUL RESOURCE:
 https://pythonprogramming.net/normalizing-sequences-deep-learning-python-tensorflow-keras/?completed=/cryptocurrency-recurrent-neural-network-deep-learning-python-tensorflow-keras/
 '''
 
-SEQ_LEN = 60
-FUTURE_PERIOD_PREDICT = 1
-
 def create_target(df, FUTURE_PERIOD_PREDICT):
-    """ Create column data that will be used as when training the model"""
+    """Create column data that will be used as when training the model"""
     df['future'] = df['Close'].shift(-FUTURE_PERIOD_PREDICT)
     classify = lambda x,y : 1 if x < y else 0
     df['target'] = list(map(classify, df['Close'], df['future']))
@@ -30,9 +36,9 @@ def scale_data(data):
     """Scale data 0-1 based on min and max in training set"""
     sc = MinMaxScaler()
     sc.fit(data)
-    train_sc = sc.transform(data)
+    scaled_data = sc.transform(data)
 
-    return data
+    return scaled_data
 
 def train_and_validation(df):
     times = sorted(df.index.values)
@@ -43,9 +49,8 @@ def train_and_validation(df):
 
     return train_df, validation_df
 
-# TODO: MAKE THIS METHOD WORK
 def preprocess_df(df, SEQ_LEN, balance=False):
-
+    """Normalize and tranform data to help for generalizing, optionally balance data"""
     pd.set_option('chained',None)
     for col in df.columns:
         if col!='target':
@@ -94,16 +99,38 @@ def preprocess_df(df, SEQ_LEN, balance=False):
         X.append(seq)
         y.append(target)
 
-    return np.array(X), y
+    return np.array(X), np.array(y)
 
+if __name__ == '__main__':
+    # global controls
+    # MODEL CTRLS
+    EPOCHS = 10
+    BATCH_SIZE = 32
 
-df = pd.read_csv("data/aapl_hist.csv")
-df.set_index('Date', inplace=True)
+    # DATA PROCESSING CTRLS
+    SEQ_LEN = 60
+    FUTURE_PERIOD_PREDICT = 1
 
-df = create_target(df, FUTURE_PERIOD_PREDICT)
+    # suppress warning/messages from tensorflow
+    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
-train_df, test_df = train_and_validation(df)
+    df = pd.read_csv("data/aapl_hist.csv")
+    df.set_index('Date', inplace=True)
 
-# data ready for training
-train_x, train_y = preprocess_df(train_df, SEQ_LEN, balance=True)
-test_x, test_y = preprocess_df(test_df, SEQ_LEN, balance=False)
+    df = create_target(df, FUTURE_PERIOD_PREDICT)
+
+    train_df, test_df = train_and_validation(df)
+
+    # data ready for training
+    train_x, train_y = preprocess_df(train_df, SEQ_LEN, balance=True)
+    test_x, test_y = preprocess_df(test_df, SEQ_LEN, balance=False)
+
+    # model building and training
+    #m = md.build_sequential_model(train_x)
+    #h = md.model_train(m, train_x, train_y, test_x, test_y, BATCH_SIZE, EPOCHS)
+
+    #test = md.load_latest_model()
+    #print(test.summary())
+
+    # model predictions
+    md.evaluate_prediction(test_x, test_y, MAIN_RANGE=2, SUB_RANGE=50)
