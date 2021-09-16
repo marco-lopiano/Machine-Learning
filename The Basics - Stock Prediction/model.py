@@ -121,6 +121,5 @@ def evaluate_prediction(test_x, test_y, MAIN_RANGE=1, SUB_RANGE=20):
         OVERALL_WRONGS+=WRONGS
 
     FULL_RANGE = MAIN_RANGE*SUB_RANGE
-    print("\nMain loop stats:")
     print(f'{"-"*3} Model has been {OVERALL_RIGHTS} times right - {(OVERALL_RIGHTS/FULL_RANGE)*100}%')
     print(f'{"-"*3} Model has been {OVERALL_WRONGS} times wrong - {(OVERALL_WRONGS/FULL_RANGE)*100}%')

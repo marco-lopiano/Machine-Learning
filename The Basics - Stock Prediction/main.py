@@ -126,11 +126,8 @@ if __name__ == '__main__':
     test_x, test_y = preprocess_df(test_df, SEQ_LEN, balance=False)
 
     # model building and training
-    #m = md.build_sequential_model(train_x)
-    #h = md.model_train(m, train_x, train_y, test_x, test_y, BATCH_SIZE, EPOCHS)
-
-    #test = md.load_latest_model()
-    #print(test.summary())
+    m = md.build_sequential_model(train_x)
+    h = md.model_train(m, train_x, train_y, test_x, test_y, BATCH_SIZE, EPOCHS)
 
     # model predictions
     md.evaluate_prediction(test_x, test_y, MAIN_RANGE=2, SUB_RANGE=50)
